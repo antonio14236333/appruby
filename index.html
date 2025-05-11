@@ -1,0 +1,479 @@
+<script>
+        // Variables globales
+        let client = null;
+        let messageContainers = {};
+        
+        // Elementos DOM
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const subscribeBtn = document.getElementById('subscribe-btn');
+        const publishBtn = document.getElementById('publish-btn');
+        const statusElement = document.getElementById('status');
+        const messagesElement = document.getElementById('messages');
+        const topicFilterInput = document.getElementById('topic-filter');
+        const publishTopicInput = document.getElementById('publish-topic');
+        const publishMessageInput = document.getElementById('publish-message');
+        
+        // Configuración MQTT
+        const broker = "f36ebb1e.ala.us-east-1.emqxsl.com";
+        const port = 8084;
+        const clientId = "cliente_web_" + Math.floor(Math.random() * 10000);
+        
+        // Función para establecer conexión MQTT
+        function connect() {
+            // Crear cliente MQTT
+            client = new Paho.MQTT.Client(broker, port, clientId);
+            
+            // Configurar callbacks
+            client.onConnectionLost = onConnectionLost;
+            client.onMessageArrived = onMessageArrived;
+            
+            // Actualizar estado a "Conectando"
+            updateStatus("Conectando...", "connecting");
+            
+            // Opciones de conexión
+            const options = {
+                onSuccess: onConnect,
+                onFailure: onFailure,
+                useSSL: true
+            };
+            
+            // Intentar conectar
+            try {
+                client.connect(options);
+            } catch (error) {
+                console.error("Error al conectar:", error);
+                updateStatus("Error al conectar: " + error.message, "disconnected");
+            }
+        }
+        
+        // Callback de conexión exitosa
+        function onConnect() {
+            updateStatus("Conectado", "connected");
+            connectBtn.disabled = true;
+            disconnectBtn.disabled = false;
+            subscribeBtn.disabled = false;
+            publishBtn.disabled = false;
+            
+            // Habilitar botones de comandos rápidos
+            document.querySelectorAll('.quick-cmd').forEach(btn => {
+                btn.disabled = false;
+            });
+            
+            // Suscribirse a los tópicos por defecto
+            subscribeToTopic('C1A8w3Z0/numeros');
+            subscribeToTopic('C1A8w3Z0/control');
+        }
+        
+        // Callback de error de conexión
+        function onFailure(error) {
+            console.error("Error de conexión:", error);
+            updateStatus("Error de conexión: " + error.errorMessage, "disconnected");
+        }
+        
+        // Callback de desconexión
+        function onConnectionLost(response) {
+            if (response.errorCode !== 0) {
+                console.log("Conexión perdida:", response.errorMessage);
+            }
+            updateStatus("Desconectado", "disconnected");
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            subscribeBtn.disabled = true;
+            publishBtn.disabled = true;
+            
+            // Deshabilitar botones de comandos rápidos
+            document.querySelectorAll('.quick-cmd').forEach(btn => {
+                btn.disabled = true;
+            });
+        }
+        
+        // Función para suscribirse a un tópico
+        function subscribeToTopic(topic = null) {
+            if (!client || !client.isConnected()) {
+                alert("No hay conexión MQTT. Conéctate primero.");
+                return;
+            }
+            
+            const topicFilter = topic || topicFilterInput.value || '#';
+            
+            try {
+                client.subscribe(topicFilter, {qos: 0});
+                console.log("Suscrito a:", topicFilter);
+                
+                // Mostrar mensaje de confirmación
+                const suscripcionMsg = document.createElement('div');
+                suscripcionMsg.className = 'message-item';
+                suscripcionMsg.innerHTML = `<div class="topic-name">Sistema</div>
+                                           <div class="message-value">Suscrito al tópico: ${topicFilter}</div>`;
+                messagesElement.appendChild(suscripcionMsg);
+            } catch (error) {
+                console.error("Error al suscribirse:", error);
+                alert("Error al suscribirse: " + error.message);
+            }
+        }
+        
+        // Función para publicar un mensaje
+        function publishMessage(topic = null, message = null) {
+            if (!client || !client.isConnected()) {
+                alert("No hay conexión MQTT. Conéctate primero.");
+                return;
+            }
+            
+            const publishTopic = topic || publishTopicInput.value;
+            const publishMessage = message || publishMessageInput.value;
+            
+            if (!publishTopic) {
+                alert("Por favor ingresa un tópico.");
+                return;
+            }
+            
+            if (!publishMessage && publishMessage !== '0') {
+                alert("Por favor ingresa un mensaje para enviar.");
+                return;
+            }
+            
+            try {
+                const mqttMessage = new Paho.MQTT.Message(publishMessage);
+                mqttMessage.destinationName = publishTopic;
+                client.send(mqttMessage);
+                console.log("Mensaje enviado a:", publishTopic, "- Contenido:", publishMessage);
+                
+                // Mostrar mensaje de confirmación
+                const publicacionMsg = document.createElement('div');
+                publicacionMsg.className = 'message-item';
+                publicacionMsg.style.backgroundColor = '#e6f7ff';
+                publicacionMsg.innerHTML = `<div class="topic-name">Enviado a: ${publishTopic}</div>
+                                           <div class="message-value"><input type="text" value="${publishMessage}" readonly></div>
+           <!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cliente MQTT</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .status {
+            text-align: center;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .connecting {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 0 5px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .topic-input {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .topic-input input {
+            padding: 8px;
+            width: 80%;
+            margin-right: 5px;
+        }
+        .message-container {
+            margin-top: 20px;
+        }
+        .message-item {
+            margin: 15px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .topic-name {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #0056b3;
+        }
+        .message-value input {
+            padding: 8px;
+            width: 80%;
+            text-align: center;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+        }
+        .timestamp {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .info-box {
+            background-color: #e7f3fe;
+            border-left: 5px solid #2196F3;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cliente MQTT</h1>
+    
+    <div class="info-box">
+        <strong>Información de conexión:</strong><br>
+        Broker: f36ebb1e.ala.us-east-1.emqxsl.com<br>
+        Puerto WebSocket: 8084 (SSL)<br>
+        <br>
+        <strong>Sobre los tópicos:</strong> Los tópicos en MQTT son como canales y siguen una estructura jerárquica, por ejemplo: <code>/temperatura</code>, <code>casa/cocina/luz</code>, etc.
+    </div>
+
+    <div class="controls">
+        <button id="connect-btn">Conectar</button>
+        <button id="disconnect-btn" disabled>Desconectar</button>
+    </div>
+
+    <div id="status" class="status disconnected">Estado: Desconectado</div>
+    
+    <div class="topic-input">
+        <input type="text" id="topic-filter" placeholder="Tópico a suscribir (ejemplo: /canal o # para todos)">
+        <button id="subscribe-btn" disabled>Suscribir</button>
+    </div>
+    
+    <div class="publish-container" style="margin: 20px 0; text-align: center; background-color: #f0f8ff; padding: 15px; border-radius: 5px;">
+        <h3>Enviar Mensaje</h3>
+        <div style="margin: 10px 0;">
+            <input type="text" id="publish-topic" value="C1A8w3Z0/control" placeholder="Tópico" style="padding: 8px; width: 60%; margin-right: 10px;">
+        </div>
+        <div style="margin: 10px 0;">
+            <input type="text" id="publish-message" placeholder="Mensaje a enviar" style="padding: 8px; width: 60%; margin-right: 10px;">
+        </div>
+        <div>
+            <button id="publish-btn" disabled style="background-color: #28a745;">Enviar</button>
+        </div>
+        <div style="margin-top: 10px;">
+            <button class="quick-cmd" data-cmd="0" style="margin: 5px; background-color: #6c757d;">Apagar LED (0)</button>
+            <button class="quick-cmd" data-cmd="1" style="margin: 5px; background-color: #ffc107; color: #000;">Encender LED (1)</button>
+            <button class="quick-cmd" data-cmd="2" style="margin: 5px; background-color: #17a2b8;">Parpadeo LED (2)</button>
+        </div>
+    </div>
+
+    <div id="messages" class="message-container">
+        <!-- Los mensajes se agregarán dinámicamente aquí -->
+    </div>
+
+    <script>
+        // Variables globales
+        let client = null;
+        let messageContainers = {};
+        
+        // Elementos DOM
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const subscribeBtn = document.getElementById('subscribe-btn');
+        const statusElement = document.getElementById('status');
+        const messagesElement = document.getElementById('messages');
+        const topicFilterInput = document.getElementById('topic-filter');
+        
+        // Configuración MQTT
+        const broker = "f36ebb1e.ala.us-east-1.emqxsl.com";
+        const port = 8084;
+        const clientId = "cliente_web_" + Math.floor(Math.random() * 10000);
+        
+        // Función para establecer conexión MQTT
+        function connect() {
+            // Crear cliente MQTT
+            client = new Paho.MQTT.Client(broker, port, clientId);
+            
+            // Configurar callbacks
+            client.onConnectionLost = onConnectionLost;
+            client.onMessageArrived = onMessageArrived;
+            
+            // Actualizar estado a "Conectando"
+            updateStatus("Conectando...", "connecting");
+            
+            // Opciones de conexión
+            const options = {
+                onSuccess: onConnect,
+                onFailure: onFailure,
+                useSSL: true
+            };
+            
+            // Intentar conectar
+            try {
+                client.connect(options);
+            } catch (error) {
+                console.error("Error al conectar:", error);
+                updateStatus("Error al conectar: " + error.message, "disconnected");
+            }
+        }
+        
+        // Callback de conexión exitosa
+        function onConnect() {
+            updateStatus("Conectado", "connected");
+            connectBtn.disabled = true;
+            disconnectBtn.disabled = false;
+            subscribeBtn.disabled = false;
+            
+            // Automáticamente suscribirse a todos los tópicos
+            subscribeToTopic('#');
+        }
+        
+        // Callback de error de conexión
+        function onFailure(error) {
+            console.error("Error de conexión:", error);
+            updateStatus("Error de conexión: " + error.errorMessage, "disconnected");
+        }
+        
+        // Callback de desconexión
+        function onConnectionLost(response) {
+            if (response.errorCode !== 0) {
+                console.log("Conexión perdida:", response.errorMessage);
+            }
+            updateStatus("Desconectado", "disconnected");
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            subscribeBtn.disabled = true;
+        }
+        
+        // Función para suscribirse a un tópico
+        function subscribeToTopic(topic = null) {
+            if (!client || !client.isConnected()) {
+                alert("No hay conexión MQTT. Conéctate primero.");
+                return;
+            }
+            
+            const topicFilter = topic || topicFilterInput.value || '#';
+            
+            try {
+                client.subscribe(topicFilter, {qos: 0});
+                console.log("Suscrito a:", topicFilter);
+                
+                // Mostrar mensaje de confirmación
+                const suscripcionMsg = document.createElement('div');
+                suscripcionMsg.className = 'message-item';
+                suscripcionMsg.innerHTML = `<div class="topic-name">Sistema</div>
+                                           <div class="message-value">Suscrito al tópico: ${topicFilter}</div>`;
+                messagesElement.appendChild(suscripcionMsg);
+            } catch (error) {
+                console.error("Error al suscribirse:", error);
+                alert("Error al suscribirse: " + error.message);
+            }
+        }
+        
+        // Callback para manejar mensajes entrantes
+        function onMessageArrived(message) {
+            const topic = message.destinationName;
+            const payload = message.payloadString;
+            console.log("Mensaje recibido en tópico:", topic, "- Contenido:", payload);
+            
+            // Determinar si el valor es numérico
+            const isNumeric = !isNaN(parseFloat(payload)) && isFinite(payload);
+            
+            // Actualizar o crear contenedor de mensaje para este tópico
+            updateMessageContainer(topic, payload, isNumeric);
+        }
+        
+        // Función para actualizar o crear contenedor de mensaje
+        function updateMessageContainer(topic, value, isNumeric) {
+            const timestamp = new Date().toLocaleTimeString();
+            
+            if (messageContainers[topic]) {
+                // Actualizar contenedor existente
+                const container = messageContainers[topic];
+                const valueInput = container.querySelector('.message-value input');
+                
+                // Actualizar tipo de input si es necesario
+                if ((isNumeric && valueInput.type !== 'number') || 
+                    (!isNumeric && valueInput.type !== 'text')) {
+                    valueInput.type = isNumeric ? 'number' : 'text';
+                }
+                
+                valueInput.value = value;
+                container.querySelector('.timestamp').textContent = 'Última actualización: ' + timestamp;
+            } else {
+                // Crear nuevo contenedor
+                const newContainer = document.createElement('div');
+                newContainer.className = 'message-item';
+                
+                const topicElement = document.createElement('div');
+                topicElement.className = 'topic-name';
+                topicElement.textContent = topic;
+                
+                const valueContainer = document.createElement('div');
+                valueContainer.className = 'message-value';
+                
+                const inputElement = document.createElement('input');
+                inputElement.type = isNumeric ? 'number' : 'text';
+                inputElement.value = value;
+                inputElement.readOnly = true;
+                
+                const timestampElement = document.createElement('div');
+                timestampElement.className = 'timestamp';
+                timestampElement.textContent = 'Recibido: ' + timestamp;
+                
+                valueContainer.appendChild(inputElement);
+                newContainer.appendChild(topicElement);
+                newContainer.appendChild(valueContainer);
+                newContainer.appendChild(timestampElement);
+                
+                messagesElement.appendChild(newContainer);
+                messageContainers[topic] = newContainer;
+            }
+        }
+        
+        // Función para actualizar el estado
+        function updateStatus(message, className) {
+            statusElement.textContent = 'Estado: ' + message;
+            statusElement.className = 'status ' + className;
+        }
+        
+        // Función para desconectar
+        function disconnect() {
+            if (client && client.isConnected()) {
+                client.disconnect();
+                messageContainers = {};
+                messagesElement.innerHTML = '';
+                updateStatus("Desconectado", "disconnected");
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                subscribeBtn.disabled = true;
+            }
+        }
+        
+        // Event listeners
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        subscribeBtn.addEventListener('click', () => subscribeToTopic());
+    </script>
+</body>
+</html>
